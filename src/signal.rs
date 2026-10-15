@@ -14,6 +14,18 @@ pub enum Equality<T> {
     Custom(fn(&T, &T) -> bool),
 }
 
+impl<T> PartialEq for Equality<T> {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Equality::AlwaysUpdate, Equality::AlwaysUpdate) => true,
+            (Equality::Custom(f1), Equality::Custom(f2)) => *f1 as usize == *f2 as usize,
+            _ => false,
+        }
+    }
+}
+
+impl<T> Eq for Equality<T> {}
+
 pub struct SignalOptions<T> {
     pub name: &'static str,
     pub equality: Equality<T>,

@@ -1,6 +1,5 @@
 use bloc_signals::{
-    get_observer, set_observer, BlocObserver, BlocSignal, CubitSignal, Equality, Signal,
-    SignalOptions,
+    get_observer, set_observer, BlocObserver, BlocSignal, CubitSignal,
 };
 
 #[test]
