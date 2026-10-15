@@ -8,7 +8,7 @@ pub struct CubitSignal<S: Clone> {
     signal: Signal<S>,
 }
 
-impl<S: Clone> CubitSignal<S> {
+impl<S: Clone + core::fmt::Debug> CubitSignal<S> {
     pub fn new(name: &'static str, initial_state: S) -> Self {
         Self::new_with_options(name, initial_state, SignalOptions::default())
     }

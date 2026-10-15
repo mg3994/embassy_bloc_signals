@@ -13,15 +13,21 @@ pub struct BlocSignal<E: Clone, S: Clone, const N: usize = 16> {
     name: &'static str,
     signal: Signal<S>,
     transformer: EventTransformer,
+    is_busy: core::sync::atomic::AtomicBool,
     #[cfg(feature = "embassy")]
     event_channel: Channel<CriticalSectionRawMutex, E, N>,
     #[cfg(not(feature = "embassy"))]
-    event_queue: core::cell::RefCell<heapless::Vec<E, N>>,
+    event_queue: critical_section::Mutex<core::cell::RefCell<heapless::Vec<E, N>>>,
 }
 
 impl<E: Clone, S: Clone, const N: usize> BlocSignal<E, S, N> {
     pub fn new(name: &'static str, initial_state: S) -> Self {
-        Self::new_with_options(name, initial_state, SignalOptions::default(), EventTransformer::Sequential)
+        Self::new_with_options(
+            name,
+            initial_state,
+            SignalOptions::default(),
+            EventTransformer::Sequential,
+        )
     }
 
     pub fn new_with_options(
@@ -35,10 +41,11 @@ impl<E: Clone, S: Clone, const N: usize> BlocSignal<E, S, N> {
             name,
             signal: Signal::new_with_options(initial_state, options),
             transformer,
+            is_busy: core::sync::atomic::AtomicBool::new(false),
             #[cfg(feature = "embassy")]
             event_channel: Channel::new(),
             #[cfg(not(feature = "embassy"))]
-            event_queue: core::cell::RefCell::new(heapless::Vec::new()),
+            event_queue: critical_section::Mutex::new(core::cell::RefCell::new(heapless::Vec::new())),
         }
     }
 
@@ -58,34 +65,38 @@ impl<E: Clone, S: Clone, const N: usize> BlocSignal<E, S, N> {
         self.signal.get_value()
     }
 
+    pub fn is_busy(&self) -> bool {
+        self.is_busy.load(core::sync::atomic::Ordering::Relaxed)
+    }
+
     pub fn add(&self, event: E) -> bool
     where
         E: core::fmt::Debug,
     {
+        if self.transformer == EventTransformer::Droppable
+            && self.is_busy.load(core::sync::atomic::Ordering::Relaxed)
+        {
+            return false;
+        }
+
         if let Some(observer) = get_observer() {
             observer.on_event(self.name, &event);
         }
 
         #[cfg(feature = "embassy")]
         {
-            match self.transformer {
-                EventTransformer::Droppable => {
-                    self.event_channel.try_send(event).is_ok()
-                }
-                _ => {
-                    // For Sequential, Restartable, Concurrent, enqueue event
-                    self.event_channel.try_send(event).is_ok()
-                }
-            }
+            self.event_channel.try_send(event).is_ok()
         }
         #[cfg(not(feature = "embassy"))]
         {
-            let mut q = self.event_queue.borrow_mut();
-            if q.len() < N {
-                q.push(event).is_ok()
-            } else {
-                false
-            }
+            critical_section::with(|cs| {
+                let mut q = self.event_queue.borrow(cs).borrow_mut();
+                if q.len() < N {
+                    q.push(event).is_ok()
+                } else {
+                    false
+                }
+            })
         }
     }
 
@@ -137,11 +148,14 @@ impl<E: Clone, S: Clone, const N: usize> BlocSignal<E, S, N> {
     {
         loop {
             let event = self.next_event().await;
-            let current_state = self.state_value();
+            self.is_busy.store(true, core::sync::atomic::Ordering::SeqCst);
 
+            let current_state = self.state_value();
             if let Some(next_state) = handler(event.clone(), current_state).await {
                 self.emit(event, next_state);
             }
+
+            self.is_busy.store(false, core::sync::atomic::Ordering::SeqCst);
         }
     }
 }

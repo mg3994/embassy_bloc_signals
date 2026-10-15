@@ -23,4 +23,5 @@ heapless = "0.8"
 
 [dev-dependencies]
 embassy-executor = { version = "0.6", features = ["arch-std", "executor-thread"] }
+static_cell = "2.1"
 tokio = { version = "1.38", features = ["full"] }

@@ -8,7 +8,7 @@ use embassy_sync::blocking_mutex::raw::CriticalSectionRawMutex;
 #[cfg(feature = "embassy")]
 use embassy_sync::watch::Watch;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy)]
 pub enum Equality<T> {
     AlwaysUpdate,
     Custom(fn(&T, &T) -> bool),
@@ -35,7 +35,6 @@ pub struct Signal<T: Clone> {
     watch: Watch<CriticalSectionRawMutex, T, 8>,
 }
 
-// CriticalSection Mutex + RefCell makes Signal Send + Sync safely in embedded environments
 unsafe impl<T: Clone + Send> Send for Signal<T> {}
 unsafe impl<T: Clone + Send> Sync for Signal<T> {}
 
@@ -119,7 +118,7 @@ impl<T: Clone> Signal<T> {
 
     #[cfg(feature = "embassy")]
     pub fn receiver(&self) -> Option<embassy_sync::watch::Receiver<'_, CriticalSectionRawMutex, T, 8>> {
-        self.watch.receiver().ok()
+        self.watch.receiver()
     }
 }
 

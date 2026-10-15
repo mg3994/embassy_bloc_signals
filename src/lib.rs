@@ -11,9 +11,15 @@ pub mod cubit;
 pub mod bloc;
 pub mod transformer;
 pub mod observer;
+pub mod replay;
+pub mod hydrate;
+pub mod computed;
 
 pub use signal::{Signal, ReadonlySignal, SignalOptions, Equality};
 pub use cubit::CubitSignal;
 pub use bloc::BlocSignal;
 pub use transformer::EventTransformer;
 pub use observer::{BlocObserver, set_observer, get_observer, Transition, Change};
+pub use replay::ReplayCubit;
+pub use hydrate::{Storage, HydratedCubit};
+pub use computed::ComputedSignal;

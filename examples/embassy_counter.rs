@@ -1,6 +1,7 @@
 use bloc_signals::{BlocObserver, BlocSignal, CubitSignal};
 use embassy_executor::Spawner;
 use embassy_futures::yield_now;
+use static_cell::StaticCell;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum CounterEvent {
@@ -26,7 +27,6 @@ impl BlocObserver for CustomObserver {
 
 static OBSERVER: CustomObserver = CustomObserver;
 
-// A Cubit for managing light switch state in an embedded task
 pub struct LightCubit {
     cubit: CubitSignal<bool>,
 }
@@ -76,17 +76,18 @@ async fn main(spawner: Spawner) {
     println!("Light state after toggle: {}", light_cubit.is_on());
 
     println!("\n--- Testing Embedded Async Bloc with Embassy ---");
-    static BLOC: BlocSignal<CounterEvent, i32, 16> = BlocSignal::new("CounterBloc", 0);
+    static BLOC_CELL: StaticCell<BlocSignal<CounterEvent, i32, 16>> = StaticCell::new();
+    let bloc = BLOC_CELL.init(BlocSignal::new("CounterBloc", 0));
 
-    spawner.spawn(bloc_task(&BLOC)).unwrap();
+    spawner.spawn(bloc_task(bloc)).unwrap();
 
-    BLOC.add(CounterEvent::Increment);
-    BLOC.add(CounterEvent::Increment);
-    BLOC.add(CounterEvent::Decrement);
+    bloc.add(CounterEvent::Increment);
+    bloc.add(CounterEvent::Increment);
+    bloc.add(CounterEvent::Decrement);
 
     yield_now().await;
     yield_now().await;
     yield_now().await;
 
-    println!("Final CounterBloc state: {}", BLOC.state_value());
+    println!("Final CounterBloc state: {}", bloc.state_value());
 }

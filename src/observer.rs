@@ -1,5 +1,8 @@
 //! Global observer and telemetry for state transitions and events.
 
+use critical_section::Mutex;
+use core::cell::RefCell;
+
 #[derive(Debug, Clone)]
 pub struct Change<S> {
     pub current_state: S,
@@ -31,18 +34,16 @@ pub trait BlocObserver {
     }
 }
 
-static mut OBSERVER: Option<&'static (dyn BlocObserver + Sync)> = None;
+static OBSERVER: Mutex<RefCell<Option<&'static (dyn BlocObserver + Sync)>>> = Mutex::new(RefCell::new(None));
 
 pub fn set_observer(observer: &'static (dyn BlocObserver + Sync)) {
-    critical_section::with(|_| {
-        unsafe {
-            OBSERVER = Some(observer);
-        }
+    critical_section::with(|cs| {
+        *OBSERVER.borrow(cs).borrow_mut() = Some(observer);
     });
 }
 
 pub fn get_observer() -> Option<&'static (dyn BlocObserver + Sync)> {
-    critical_section::with(|_| {
-        unsafe { OBSERVER }
+    critical_section::with(|cs| {
+        *OBSERVER.borrow(cs).borrow()
     })
 }
