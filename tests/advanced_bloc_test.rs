@@ -1,6 +1,7 @@
 use bloc_signals::{
     ComputedSignal, HydratedCubit, ReplayCubit, Signal, Storage,
 };
+use static_cell::StaticCell;
 
 #[test]
 fn test_replay_cubit_undo_redo() {
@@ -69,4 +70,26 @@ fn test_computed_signal() {
     count_signal.set_value(10);
     double_signal.update(&count_signal, |x| x * 2);
     assert_eq!(double_signal.get_value(), 20);
+}
+
+static COUNT_SIGNAL: StaticCell<Signal<i32>> = StaticCell::new();
+static TRIPLE_SIGNAL: StaticCell<ComputedSignal<i32>> = StaticCell::new();
+
+#[tokio::test]
+async fn test_computed_signal_auto_update() {
+    let count_signal: &'static Signal<i32> = COUNT_SIGNAL.init(Signal::new(3));
+    let triple_signal: &'static ComputedSignal<i32> = TRIPLE_SIGNAL.init(ComputedSignal::compute(count_signal, |x| x * 3));
+
+    assert_eq!(triple_signal.get_value(), 9);
+
+    let handle = tokio::spawn(async move {
+        triple_signal.listen_and_update(count_signal, |x| x * 3).await;
+    });
+
+    tokio::task::yield_now().await;
+    count_signal.set_value(5);
+    tokio::task::yield_now().await;
+
+    assert_eq!(triple_signal.get_value(), 15);
+    handle.abort();
 }

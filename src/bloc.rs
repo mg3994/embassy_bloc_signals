@@ -133,9 +133,22 @@ impl<E: Clone, S: Clone, const N: usize> BlocSignal<E, S, N> {
         self.event_channel.receive().await
     }
 
-    #[cfg(feature = "embassy")]
     pub fn try_next_event(&self) -> Option<E> {
-        self.event_channel.try_receive().ok()
+        #[cfg(feature = "embassy")]
+        {
+            self.event_channel.try_receive().ok()
+        }
+        #[cfg(not(feature = "embassy"))]
+        {
+            critical_section::with(|cs| {
+                let mut q = self.event_queue.borrow(cs).borrow_mut();
+                if q.is_empty() {
+                    None
+                } else {
+                    Some(q.remove(0))
+                }
+            })
+        }
     }
 
     #[cfg(feature = "embassy")]

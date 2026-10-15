@@ -27,4 +27,18 @@ impl<T: Clone> ComputedSignal<T> {
         let new_val = compute_fn(source.get_value());
         self.computed_signal.set_value(new_val)
     }
+
+    #[cfg(feature = "embassy")]
+    pub async fn listen_and_update<S1: Clone, F>(&self, source: &Signal<S1>, compute_fn: F)
+    where
+        F: Fn(S1) -> T,
+    {
+        if let Some(mut receiver) = source.receiver() {
+            loop {
+                let val = receiver.changed().await;
+                let new_computed = compute_fn(val);
+                self.computed_signal.set_value(new_computed);
+            }
+        }
+    }
 }
