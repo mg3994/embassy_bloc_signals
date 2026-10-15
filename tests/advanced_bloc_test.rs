@@ -1,5 +1,5 @@
 use bloc_signals::{
-    ComputedSignal, HydratedCubit, ReplayCubit, Signal, Storage,
+    ComputedSignal, ComputedSignal2, HydratedCubit, ReplayCubit, Signal, Storage,
 };
 use static_cell::StaticCell;
 
@@ -70,6 +70,19 @@ fn test_computed_signal() {
     count_signal.set_value(10);
     double_signal.update(&count_signal, |x| x * 2);
     assert_eq!(double_signal.get_value(), 20);
+}
+
+#[test]
+fn test_computed_signal2_multi_source() {
+    let sig1 = Signal::new(10);
+    let sig2 = Signal::new(20);
+
+    let sum_sig = ComputedSignal2::compute(&sig1, &sig2, |a, b| a + b);
+    assert_eq!(sum_sig.get_value(), 30);
+
+    sig1.set_value(15);
+    sum_sig.update(&sig1, &sig2, |a, b| a + b);
+    assert_eq!(sum_sig.get_value(), 35);
 }
 
 static COUNT_SIGNAL: StaticCell<Signal<i32>> = StaticCell::new();
